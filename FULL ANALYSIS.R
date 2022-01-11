@@ -1,876 +1,26 @@
----
-title: "Supplement file: R code with Dta"
-author: "Ellie Sherrard-Smith & Mercy Opiyo"
-date: "11/01/2021"
-output: pdf_document
----
+library(rstan)
 
-## Analysis 0 Data
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 
-Data are available on request.
 
-```{r setup, include = TRUE,  eval=FALSE}
-
-###########################################################
-##
-## Questionnaire 1 Matutuine and Boane
-## 
-## 
-
-library(dplyr)
-library(plotly)
-library(crosstalk)
-library(htmltools)
-library(DT)
-
-setwd('C:/Users/esherrar/Documents/Rprojects/PLoSGPH_Opiyo_2022')
-
-dec <- 1
-df <- NULL
-load('data_questionnaire/main_data_final_df.rdata')
-
-df$calendarMonth <- format(as.Date(df$c_date), "%Y-%m")
-m1df <- df[df$c_visit_month%in%'M1',] #houses in visit M1, assumed to be the total
-q1c <- NULL
-load('data_questionnaire/q1_choices_q1c.rdata')
-load('data_questionnaire/common_data_final_wide_cdfw.rdata')#Data with of only common (c_) variables in wide format
-q2 <- NULL#questionnaire 2
-smrq2 <- NULL  #sleep modified room questionnaire 2
-surq2 <- NULL  #sleep unmodified room questionnaire 2
-load('data_questionnaire/q2.rdata')
-load('data_questionnaire/smrq2.rdata')
-load('data_questionnaire/surq2.rdata')
-
-
-
-count_by_start_month_f = function(start_date, district){
-  counter = numeric(6)
-  Matut_houses_oct = sort(df$houseid[df$c_district == district & df$c_visit_month == "M1" & df$calendarMonth == start_date])
-  counter[1] = length(Matut_houses_oct)
-  m2_mat =sort(df$houseid[df$c_district == district & df$c_visit_month == "M2"])
-  m2_mat_counta = match(Matut_houses_oct, m2_mat, nomatch = NA, incomparables = NULL)
-  counter[2] = length(na.omit(m2_mat_counta))
-  
-  m3_mat =sort(df$houseid[df$c_district == district & df$c_visit_month == "M3"])
-  m3_mat_counta = match(Matut_houses_oct, m3_mat, nomatch = NA, incomparables = NULL)
-  counter[3] = length(na.omit(m3_mat_counta))
-  
-  m4_mat =sort(df$houseid[df$c_district == district & df$c_visit_month == "M4"])
-  m4_mat_counta = match(Matut_houses_oct, m4_mat, nomatch = NA, incomparables = NULL)
-  counter[4] = length(na.omit(m4_mat_counta))
-  
-  m5_mat =sort(df$houseid[df$c_district == district & df$c_visit_month == "M5"])
-  m5_mat_counta = match(Matut_houses_oct, m5_mat, nomatch = NA, incomparables = NULL)
-  counter[5] = length(na.omit(m5_mat_counta))
-  
-  m6_mat = sort(df$houseid[df$c_district == district & df$c_visit_month == "M6"])
-  m6_mat_counta = match(Matut_houses_oct, m6_mat, nomatch = NA, incomparables = NULL)
-  counter[6] = length(na.omit(m6_mat_counta))
-  
-  return(counter)
-}
-count_by_start_month_f(district = "Matutuine", start_date = sort(unique(df$calendarMonth))[1])
-count_by_start_month_f(district = "Matutuine", start_date = sort(unique(df$calendarMonth))[2])
-count_by_start_month_f(district = "Matutuine", start_date = sort(unique(df$calendarMonth))[3])
-
-count_by_start_month_f(district = "Boane", start_date = sort(unique(df$calendarMonth))[1])
-count_by_start_month_f(district = "Boane", start_date = sort(unique(df$calendarMonth))[2])
-count_by_start_month_f(district = "Boane", start_date = sort(unique(df$calendarMonth))[3])
-## This recreates the data in Table 1 main maunscript
-
-## MATUTUINE
-## This is our data for Houses tracked from October
-Matut_houses_oct = subset(df,df$c_district == "Matutuine" & df$c_visit_month == "M1" & df$calendarMonth == sort(unique(df$calendarMonth))[1])
-
-tapply(Matut_houses_oct$houseid,Matut_houses_oct$housesprayed,length)
-for(i in 1:nrow(Matut_houses_oct)){
-  Matut_houses_oct$total_rooms[i] = sum(Matut_houses_oct$c_combinedanimalroom[i],Matut_houses_oct$c_combinedlivingroom[i],
-                                        Matut_houses_oct$c_combinedbedroom[i],Matut_houses_oct$c_combinedkitchen[i],
-                                        Matut_houses_oct$c_combinedstorageroom[i],Matut_houses_oct$c_combinedbathroom[i],
-                                        Matut_houses_oct$c_combinedgarage[i],Matut_houses_oct$c_combinedother[i],na.rm=TRUE)
-  
-  Matut_houses_oct$total_rooms_added[i] = sum(Matut_houses_oct$c_addedanimalroom[i],Matut_houses_oct$c_addedlivingroom[i],
-                                        Matut_houses_oct$c_addedbedroom[i],Matut_houses_oct$c_addedkitchen[i],
-                                        Matut_houses_oct$c_addedstorageroom[i],Matut_houses_oct$c_addedbathroom[i],
-                                        Matut_houses_oct$c_addedgarage[i],Matut_houses_oct$c_addedother[i],na.rm=TRUE)
-  
-  Matut_houses_oct$total_rooms_mod[i] = sum(Matut_houses_oct$c_modifiedanimalroom[i],Matut_houses_oct$c_modifiedlivingroom[i],
-                                        Matut_houses_oct$c_modifiedbedroom[i],Matut_houses_oct$c_modifiedkitchen[i],
-                                        Matut_houses_oct$c_modifiedstorageroom[i],Matut_houses_oct$c_modifiedbathroom[i],
-                                        Matut_houses_oct$c_modifiedgarage[i],Matut_houses_oct$c_modifiedother[i],na.rm=TRUE)
-  
-  
-}
-tapply(Matut_houses_oct$c_modifiedbedroom,Matut_houses_oct$c_combinedbedroom,length)
-tapply(Matut_houses_oct$c_combinedbedroom,Matut_houses_oct$c_modifiedbedroom,length)
-tapply(Matut_houses_oct$c_combinedbedroom,Matut_houses_oct$c_addedbedroom,length)
-## 5 of the 43,  1 bedroom compounds
-## 5 of the 31,  2 bedroom compounds
-## 1 of the 19,  3 bedroom compounds
-## 1 pf the 10,  4 bedroom compounds
-## are modified
-bedrooms = c(43,31,19,10,2,3,1,0,2,0,1) ## maximum 11 bedroons
-modified_bedrooms = c(5,5,1,1,0,0,0,0,0,0,0)
-added_bedrooms = rep(0,11)
-
-tapply(Matut_houses_oct$c_modifiedlivingroom,Matut_houses_oct$c_combinedlivingroom,length)
-tapply(Matut_houses_oct$c_combinedlivingroom,Matut_houses_oct$c_modifiedlivingroom,length)
-tapply(Matut_houses_oct$c_combinedlivingroom,Matut_houses_oct$c_addedlivingroom,length)
-## 11 0f the 68, 1 livingroom compounds
-## 1 of the 20, 2 living room compounds
-livingrooms = c(68,20,3,1,0,1,1)
-modified_livingrooms = c(11,1,rep(0,5))
-added_livingrooms = rep(0,7)
-
-## no modifications in bathrooms
-## no modifications in animal rooms
-## no modifications in garages
-
-tapply(Matut_houses_oct$c_modifiedkitchen,Matut_houses_oct$c_combinedkitchen,length)
-tapply(Matut_houses_oct$c_combinedkitchen,Matut_houses_oct$c_modifiedkitchen,length)
-tapply(Matut_houses_oct$c_combinedkitchen,Matut_houses_oct$c_addedkitchen,length)
-## 2 0f the 33, 1 kitchen compounds
-kitchens = c(33,3)
-modified_kitchens = c(2,0)
-added_kitchens = rep(0,2)
-
-tapply(Matut_houses_oct$c_modifiedstorageroom,Matut_houses_oct$c_combinedstorageroom,length)
-tapply(Matut_houses_oct$c_combinedstorageroom,Matut_houses_oct$c_modifiedstorageroom,length)
-tapply(Matut_houses_oct$c_combinedstorageroom,Matut_houses_oct$c_addedstorageroom,length)
-## 2 0f the 33, 1 kitchen compounds
-storage = c(9,3,2,1,1)
-modified_storage = c(0,1,0,0,0)
-added_storage = rep(0,5)
-
-to_plot_A = c(bedrooms,NA,livingrooms,NA,kitchens,NA,storage)
-to_plot_B = c(modified_bedrooms,NA,modified_livingrooms,NA,modified_kitchens,NA,modified_storage)
-cols_A = rep(adegenet::transp("grey",c(0.1,0.4,0.7,0.9)),c(12,8,3,5))
-
-       
-## Total compounds with any modified rooms in M1 october start
-length(Matut_houses_oct$total_rooms_mod[Matut_houses_oct$total_rooms_mod > 0])
-
-
-
-## Now for october start FOLLOW UP MONTHS
-PULL_TOTAL_MOD_ADDED_FOR_Ms = function(dataInitHH,follow_up_month){
-  ## Now for M2 october start
-  m2_match =Matut_houses_oct$houseid
-  Matut_houses_octM2temp2 = subset(df,df$c_district == "Matutuine" & df$c_visit_month == follow_up_month)
-  Matut_houses_octM2 = Matut_houses_octM2temp2[Matut_houses_octM2temp2$houseid %in% m2_match, ]
-  dim(Matut_houses_octM2)
-  
-  for(i in 1:nrow(Matut_houses_octM2)){
-    Matut_houses_octM2$total_rooms[i] = sum(Matut_houses_octM2$c_combinedanimalroom[i],Matut_houses_octM2$c_combinedlivingroom[i],
-                                            Matut_houses_octM2$c_combinedbedroom[i],Matut_houses_octM2$c_combinedkitchen[i],
-                                            Matut_houses_octM2$c_combinedstorageroom[i],Matut_houses_octM2$c_combinedbathroom[i],
-                                            Matut_houses_octM2$c_combinedgarage[i],Matut_houses_octM2$c_combinedother[i],na.rm=TRUE)
-    
-    Matut_houses_octM2$total_rooms_added[i] = sum(Matut_houses_octM2$c_addedanimalroom[i],Matut_houses_octM2$c_addedlivingroom[i],
-                                                    Matut_houses_octM2$c_addedbedroom[i],Matut_houses_octM2$c_addedkitchen[i],
-                                                    Matut_houses_octM2$c_addedstorageroom[i],Matut_houses_octM2$c_addedbathroom[i],
-                                                    Matut_houses_octM2$c_addedgarage[i],Matut_houses_octM2$c_addedother[i],na.rm=TRUE)
-    
-    Matut_houses_octM2$total_rooms_mod[i] = sum(Matut_houses_octM2$c_modifiedanimalroom[i],Matut_houses_octM2$c_modifiedlivingroom[i],
-                                                  Matut_houses_octM2$c_modifiedbedroom[i],Matut_houses_octM2$c_modifiedkitchen[i],
-                                                  Matut_houses_octM2$c_modifiedstorageroom[i],Matut_houses_octM2$c_modifiedbathroom[i],
-                                                  Matut_houses_octM2$c_modifiedgarage[i],Matut_houses_octM2$c_modifiedother[i],na.rm=TRUE)
-    
-    
-  }
-  return(
-    list(
-    c(length(Matut_houses_octM2$total_rooms_mod[Matut_houses_octM2$total_rooms_mod > 0]),
-           length(Matut_houses_octM2$total_rooms_added[Matut_houses_octM2$total_rooms_added > 0])),
-    Matut_houses_octM2
-           )
-  )
-  
-}
-Matut_M2 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Matut_houses_oct$houseid,
-                            follow_up_month = "M2")
-Matut_M3 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Matut_houses_oct$houseid,
-                            follow_up_month = "M3")
-Matut_M4 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Matut_houses_oct$houseid,
-                            follow_up_month = "M4")
-Matut_M5 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Matut_houses_oct$houseid,
-                            follow_up_month = "M5")
-Matut_M6 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Matut_houses_oct$houseid,
-                            follow_up_month = "M6")
-
-## For Table 1: modified rooms
-c(length(Matut_houses_oct$total_rooms_mod[Matut_houses_oct$total_rooms_mod > 0]),
-  Matut_M2[[1]][1],Matut_M3[[1]][1],Matut_M4[[1]][1],Matut_M5[[1]][1],Matut_M6[[1]][1])
-
-c(length(Matut_houses_oct$total_rooms_added[Matut_houses_oct$total_rooms_added > 0]),
-  Matut_M2[[1]][2],Matut_M3[[1]][2],Matut_M4[[1]][2],Matut_M5[[1]][2],Matut_M6[[1]][2])
-
-sum(Matut_M2[[2]]$total_rooms_added)
-sum(Matut_M2[[2]]$total_rooms_mod)
-
-
-tapply(Matut_M6[[2]]$c_combinedbedroom,Matut_M6[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M6 = c(4,4,1,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M6[[2]]$c_combinedlivingroom,Matut_M6[[2]]$c_modifiedlivingroom,length)
-tapply(Matut_M6[[2]]$c_combinedkitchen,Matut_M6[[2]]$c_modifiedkitchen,length)
-tapply(Matut_M6[[2]]$c_combinedstorageroom,Matut_M6[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M6 = c(12,0,0,0,0,0,0)##7
-modified_kitchens_M6 = c(1,0)##2
-modified_storage_M6 = c(1,0,0,0,0)##5
-
-tapply(Matut_M5[[2]]$c_combinedbedroom,Matut_M5[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M5 = c(6,3,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M5[[2]]$c_combinedlivingroom,Matut_M5[[2]]$c_modifiedlivingroom,length)
-tapply(Matut_M5[[2]]$c_combinedkitchen,Matut_M5[[2]]$c_modifiedkitchen,length)
-tapply(Matut_M5[[2]]$c_combinedstorageroom,Matut_M5[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M5 = c(12,0,0,0,0,0,0)##7
-modified_kitchens_M5 = c(0,0)##2
-modified_storage_M5 = c(1,0,0,0,0)##5
-
-tapply(Matut_M4[[2]]$c_combinedbedroom,Matut_M4[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M4 = c(14,3,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M4[[2]]$c_combinedlivingroom,Matut_M4[[2]]$c_modifiedlivingroom,length)
-tapply(Matut_M4[[2]]$c_combinedkitchen,Matut_M4[[2]]$c_modifiedkitchen,length)
-tapply(Matut_M4[[2]]$c_combinedstorageroom,Matut_M4[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M4 = c(15,0,0,0,0,0,0)##7
-modified_kitchens_M4 = c(1,0)##2
-modified_storage_M4 = c(1,0,0,0,0)##5
-
-
-tapply(Matut_M3[[2]]$c_combinedbedroom,Matut_M3[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M3 = c(12,5,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M3[[2]]$c_combinedlivingroom,Matut_M3[[2]]$c_modifiedlivingroom,length)
-tapply(Matut_M3[[2]]$c_combinedkitchen,Matut_M3[[2]]$c_modifiedkitchen,length)
-tapply(Matut_M3[[2]]$c_combinedstorageroom,Matut_M3[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M3 = c(11,0,0,0,0,0,0)##7
-modified_kitchens_M3 = c(0,0)##2
-modified_storage_M3 = c(1,0,0,0,0)##5
-
-
-tapply(Matut_M2[[2]]$c_combinedbedroom,Matut_M2[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M2 = c(3,1,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M2[[2]]$c_combinedlivingroom,Matut_M2[[2]]$c_modifiedlivingroom,length)
-tapply(Matut_M2[[2]]$c_combinedkitchen,Matut_M2[[2]]$c_modifiedkitchen,length)
-tapply(Matut_M2[[2]]$c_combinedstorageroom,Matut_M2[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M2 = c(6,0,0,0,0,0,0)##7
-modified_kitchens_M2 = c(0,0)##2
-modified_storage_M2 = c(0,0,0,0,0)##5
-
-
-96/sum(Matut_houses_oct$c_combinedbedroom,na.rm = T)
-69/sum(Matut_houses_oct$c_combinedlivingroom,na.rm = T)
-
-to_plot_A = c(bedrooms,NA,livingrooms,NA,kitchens,NA,storage)
-to_plot_M6 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4+modified_bedrooms_M5+modified_bedrooms_M6,NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4+modified_livingrooms_M5+modified_livingrooms_M6,NA,modified_kitchens+modified_kitchens_M4+modified_kitchens_M6,NA,modified_storage+modified_storage_M3+modified_storage_M4+modified_storage_M5++modified_storage_M6)
-to_plot_M5 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4+modified_bedrooms_M5,                     NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4+modified_livingrooms_M5,                        NA,modified_kitchens+modified_kitchens_M4,                     NA,modified_storage+modified_storage_M3+modified_storage_M4+modified_storage_M5)##GREEN
-to_plot_M4 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4,                                          NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4,                                                NA,modified_kitchens+modified_kitchens_M4,                     NA,modified_storage+modified_storage_M3+modified_storage_M4)##RED
-to_plot_M3 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3,                                                               NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3,                                                                        NA,modified_kitchens,                                          NA,modified_storage+modified_storage_M3)##BLUE
-to_plot_M2 = c(modified_bedrooms+modified_bedrooms_M2,                                                                                    NA,modified_livingrooms+modified_livingrooms_M2,                                                                                                NA,modified_kitchens,                                          NA,modified_storage)##PURPLE
-to_plot_M1 = c(modified_bedrooms,NA,modified_livingrooms,NA,modified_kitchens,NA,modified_storage)##ORANGE
-
-length(to_plot_A);length(to_plot_M6);length(to_plot_M5);length(to_plot_M4);length(to_plot_M3);length(to_plot_M2);length(to_plot_M1)
-
-sum(to_plot_M6,na.rm=TRUE)
-##TOTAL ROOMS MODIFIED
-FROM_to_plot_M6 = c(c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4+modified_bedrooms_M5+modified_bedrooms_M6)*c(1:11),
-                    c(modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4+modified_livingrooms_M5+modified_livingrooms_M6)*c(1:7),
-                    c(modified_kitchens+modified_kitchens_M2+modified_kitchens_M3+modified_kitchens_M4+modified_kitchens_M5+modified_kitchens_M6)*c(1:2),
-                    c(modified_storage+modified_storage_M2+modified_storage_M3+modified_storage_M4+modified_storage_M5+modified_storage_M6)*c(1:5))
-sum(FROM_to_plot_M6,na.rm=TRUE)
-
-
-cols_A = rep(adegenet::transp("grey",c(0.1,0.4,0.7,0.9)),c(12,8,3,5))
-
-
-
-### And added rooms?
-
-tapply(Matut_M6[[2]]$c_combinedbedroom,Matut_M6[[2]]$c_addedbedroom,length)
-added_bedrooms_M6 = c(6,1,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M6[[2]]$c_combinedlivingroom,Matut_M6[[2]]$c_addedlivingroom,length)
-tapply(Matut_M6[[2]]$c_combinedkitchen,Matut_M6[[2]]$c_addedkitchen,length)
-tapply(Matut_M6[[2]]$c_combinedstorageroom,Matut_M6[[2]]$c_addedstorageroom,length)
-added_livingrooms_M6 = c(4,0,0,0,0,0,0)##7
-added_kitchens_M6 = c(0,0)##2
-added_storage_M6 = c(1,0,0,0,0)##5
-
-tapply(Matut_M5[[2]]$c_combinedbedroom,Matut_M5[[2]]$c_addedbedroom,length)
-added_bedrooms_M5 = c(5,3,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M5[[2]]$c_combinedlivingroom,Matut_M5[[2]]$c_addedlivingroom,length)
-tapply(Matut_M5[[2]]$c_combinedkitchen,Matut_M5[[2]]$c_addedkitchen,length)
-tapply(Matut_M5[[2]]$c_combinedstorageroom,Matut_M5[[2]]$c_addedstorageroom,length)
-added_livingrooms_M5 = c(3,0,0,0,0,0,0)##7
-added_kitchens_M5 = c(0,0)##2
-added_storage_M5 = c(2,0,0,0,0)##5
-
-tapply(Matut_M4[[2]]$c_combinedbedroom,Matut_M4[[2]]$c_addedbedroom,length)
-added_bedrooms_M4 = c(6,3,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M4[[2]]$c_combinedlivingroom,Matut_M4[[2]]$c_addedlivingroom,length)
-tapply(Matut_M4[[2]]$c_combinedkitchen,Matut_M4[[2]]$c_addedkitchen,length)
-tapply(Matut_M4[[2]]$c_combinedstorageroom,Matut_M4[[2]]$c_addedstorageroom,length)
-added_livingrooms_M4 = c(2,0,0,0,0,0,0)##7
-added_kitchens_M4 = c(2,0)##2
-added_storage_M4 = c(1,0,0,0,0)##5
-
-
-tapply(Matut_M3[[2]]$c_combinedbedroom,Matut_M3[[2]]$c_addedbedroom,length)
-added_bedrooms_M3 = c(12,5,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M3[[2]]$c_combinedlivingroom,Matut_M3[[2]]$c_addedlivingroom,length)
-tapply(Matut_M3[[2]]$c_combinedkitchen,Matut_M3[[2]]$c_addedkitchen,length)
-tapply(Matut_M3[[2]]$c_combinedstorageroom,Matut_M3[[2]]$c_addedstorageroom,length)
-added_livingrooms_M3 = c(11,0,0,0,0,0,0)##7
-added_kitchens_M3 = c(0,0)##2
-added_storage_M3 = c(1,0,0,0,0)##5
-
-
-tapply(Matut_M2[[2]]$c_combinedbedroom,Matut_M2[[2]]$c_addedbedroom,length)
-added_bedrooms_M2 = c(5,1,0,0,0,0,0,0,0,0,0)##11
-tapply(Matut_M2[[2]]$c_combinedlivingroom,Matut_M2[[2]]$c_addedlivingroom,length)
-tapply(Matut_M2[[2]]$c_combinedkitchen,Matut_M2[[2]]$c_addedkitchen,length)
-tapply(Matut_M2[[2]]$c_combinedkitchen,Matut_M2[[2]]$c_addedstorageroom,length)
-added_livingrooms_M2 = c(1,1,0,0,0,0,0)##7
-added_kitchens_M2 = c(4,0)##2
-added_storage_M2 = c(2,0,0,0,0)##5
-
-## (There were no added rooms in M1)
-
-
-### Figure 3 in the main manuscript
-
-par(mfrow=c(2,1))
-
-to_plota_M6 = c(added_bedrooms_M2+added_bedrooms_M3+added_bedrooms_M4+added_bedrooms_M5+added_bedrooms_M6,NA,added_livingrooms_M2+added_livingrooms_M3+added_livingrooms_M4+added_livingrooms_M5+added_livingrooms_M6, NA,added_kitchens_M2+added_kitchens_M3+added_kitchens_M4+added_kitchens_M5+added_kitchens_M6,NA,added_storage_M2+added_storage_M3+added_storage_M4+added_storage_M5++added_storage_M6)
-to_plota_M5 = c(added_bedrooms_M2+added_bedrooms_M3+added_bedrooms_M4+added_bedrooms_M5,                  NA,added_livingrooms_M2+added_livingrooms_M3+added_livingrooms_M4+added_livingrooms_M5,                      NA,added_kitchens_M2+added_kitchens_M3+added_kitchens_M4+added_kitchens_M5,                  NA,added_storage_M2+added_storage_M3+added_storage_M4+added_storage_M5)##GREEN
-to_plota_M4 = c(added_bedrooms_M2+added_bedrooms_M3+added_bedrooms_M4,                                    NA,added_livingrooms_M2+added_livingrooms_M3+added_livingrooms_M4,                                           NA,added_kitchens_M2+added_kitchens_M3+added_kitchens_M4,                                    NA,added_storage_M2+added_storage_M3+added_storage_M4)##RED
-to_plota_M3 = c(added_bedrooms_M2+added_bedrooms_M3,                                                      NA,added_livingrooms_M2+added_livingrooms_M3,                                                                NA,added_kitchens_M2+added_kitchens_M3,                                                      NA,added_storage_M2+added_storage_M3)##BLUE
-to_plota_M2 = c(added_bedrooms_M2,                                                                        NA,added_livingrooms_M2,                                                                                     NA,added_kitchens_M2,                                                                        NA,added_storage_M2)##PURPLE
-
-
-
-
-cols_A = rep(adegenet::transp("grey",c(0.1,0.4,0.7,0.9)),c(12,8,3,5))
-
-barplot(to_plot_A+to_plota_M6,col=cols_A,lty=2,
-        xlab="Rooms in compounds",xaxt="n",yaxt="n",
-        ylab="Frequency", main = "Matutuine (October cohort)")
-barplot(to_plot_A+to_plota_M5,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A+to_plota_M4,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A+to_plota_M3,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A+to_plota_M2,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",
-        ylab="", main = "")
-
-
-barplot(to_plot_M6,add=TRUE,col = adegenet::transp("yellow",0.7),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M5,add=TRUE,col = adegenet::transp("orange",0.3),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M4,add=TRUE,col = adegenet::transp("orange",0.3),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M3,add=TRUE,col = adegenet::transp("orange"),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M2,add=TRUE,col = adegenet::transp("darkred",0.7),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M1,add=TRUE,col = "darkred",
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-axis(1,at=seq(1,33,length=28),
-     labels=c(1:11,NA,1:7,NA,1:2,NA,1:5))
-axis(2,las=2, at=c(0,10,20,30,40,50,60,70,80,90))
-
-abline(v=14,lty=2,lwd=2,col="grey20")
-text(7,50,"Bedrooms")
-
-abline(v=23.5,lty=2,lwd=2,col="grey20")
-text(18.7,50,"Living rooms")
-
-abline(v=27,lty=2,lwd=2,col="grey20")
-text(25,50,"Kitchens")
-text(30,50,"Storage rooms")
-
-legend(2.6,90,
-       legend = c("Added rooms (above solid line)",
-                  "Modified rooms","M1 - M6 (Darker to paler shades)"),
-       col=c("grey70","orange",NA),pch=15,bty="n",cex=1)
-
-
-
-##
-## REPEAT FOR BOANE
-## This is our data for Houses tracked from October
-Boane_houses_oct = subset(df,df$c_district == "Boane" & df$c_visit_month == "M1" & df$calendarMonth == sort(unique(df$calendarMonth))[1])
-
-tapply(Boane_houses_oct$houseid,Boane_houses_oct$housesprayed,length)
-for(i in 1:nrow(Boane_houses_oct)){
-  Boane_houses_oct$total_rooms[i] = sum(Boane_houses_oct$c_combinedanimalroom[i],Boane_houses_oct$c_combinedlivingroom[i],
-                                        Boane_houses_oct$c_combinedbedroom[i],Boane_houses_oct$c_combinedkitchen[i],
-                                        Boane_houses_oct$c_combinedstorageroom[i],Boane_houses_oct$c_combinedbathroom[i],
-                                        Boane_houses_oct$c_combinedgarage[i],Boane_houses_oct$c_combinedother[i],na.rm=TRUE)
-  
-  Boane_houses_oct$total_rooms_added[i] = sum(Boane_houses_oct$c_addedanimalroom[i],Boane_houses_oct$c_addedlivingroom[i],
-                                              Boane_houses_oct$c_addedbedroom[i],Boane_houses_oct$c_addedkitchen[i],
-                                              Boane_houses_oct$c_addedstorageroom[i],Boane_houses_oct$c_addedbathroom[i],
-                                              Boane_houses_oct$c_addedgarage[i],Boane_houses_oct$c_addedother[i],na.rm=TRUE)
-  
-  Boane_houses_oct$total_rooms_mod[i] = sum(Boane_houses_oct$c_modifiedanimalroom[i],Boane_houses_oct$c_modifiedlivingroom[i],
-                                            Boane_houses_oct$c_modifiedbedroom[i],Boane_houses_oct$c_modifiedkitchen[i],
-                                            Boane_houses_oct$c_modifiedstorageroom[i],Boane_houses_oct$c_modifiedbathroom[i],
-                                            Boane_houses_oct$c_modifiedgarage[i],Boane_houses_oct$c_modifiedother[i],na.rm=TRUE)
-  
-  
-}
-tapply(Boane_houses_oct$c_modifiedbedroom,Boane_houses_oct$c_combinedbedroom,length)
-tapply(Boane_houses_oct$c_combinedbedroom,Boane_houses_oct$c_modifiedbedroom,length)
-tapply(Boane_houses_oct$c_combinedbedroom,Boane_houses_oct$c_addedbedroom,length)
-## are modified
-bedrooms = c(19,35,25,3,4) ## maximum 5 bedroons
-modified_bedrooms = c(1,0,1,0,0)
-
-tapply(Boane_houses_oct$c_modifiedlivingroom,Boane_houses_oct$c_combinedlivingroom,length)
-tapply(Boane_houses_oct$c_combinedlivingroom,Boane_houses_oct$c_modifiedlivingroom,length)
-tapply(Boane_houses_oct$c_combinedlivingroom,Boane_houses_oct$c_addedlivingroom,length)
-## living room compounds
-livingrooms = c(65,11)
-modified_livingrooms = c(3,1)
-
-## no modifications in bathrooms
-## no modifications in animal rooms
-## no modifications in garages
-
-tapply(Boane_houses_oct$c_modifiedkitchen,Boane_houses_oct$c_combinedkitchen,length)
-tapply(Boane_houses_oct$c_combinedkitchen,Boane_houses_oct$c_modifiedkitchen,length)
-tapply(Boane_houses_oct$c_combinedkitchen,Boane_houses_oct$c_addedkitchen,length)
-## 2 0f the 33, 1 kitchen compounds
-kitchens = c(21)
-modified_kitchens = c(0)
-
-tapply(Boane_houses_oct$c_modifiedstorageroom,Boane_houses_oct$c_combinedstorageroom,length)
-tapply(Boane_houses_oct$c_combinedstorageroom,Boane_houses_oct$c_modifiedstorageroom,length)
-tapply(Boane_houses_oct$c_combinedstorageroom,Boane_houses_oct$c_addedstorageroom,length)
-## 2 0f the 33, 1 kitchen compounds
-storage = c(4)
-modified_storage = c(0)
-
-to_plot_A = c(bedrooms,NA,livingrooms,NA,kitchens,NA,storage)
-# to_plot_B = c(modified_bedrooms,NA,modified_livingrooms,NA,0,NA,0)
-cols_A = rep(adegenet::transp("grey",c(0.1,0.4,0.7,0.9)),c(6,3,2,2))
-
-
-## Total compounds with any modified rooms in M1 october start
-length(Boane_houses_oct$total_rooms_mod[Boane_houses_oct$total_rooms_mod > 0])
-
-
-
-## Now for october start FOLLOW UP MONTHS
-PULL_TOTAL_MOD_ADDED_FOR_Ms = function(dataInitHH,follow_up_month){
-  ## Now for M2 october start
-  m2_match = Boane_houses_oct$houseid
-  Boane_houses_octM2temp2 = subset(df,df$c_district == "Boane" & df$c_visit_month == follow_up_month)
-  Boane_houses_octM2 = Boane_houses_octM2temp2[Boane_houses_octM2temp2$houseid %in% m2_match, ]
-  dim(Boane_houses_octM2)
-  
-  for(i in 1:nrow(Boane_houses_octM2)){
-    Boane_houses_octM2$total_rooms[i] = sum(Boane_houses_octM2$c_combinedanimalroom[i],Boane_houses_octM2$c_combinedlivingroom[i],
-                                            Boane_houses_octM2$c_combinedbedroom[i],Boane_houses_octM2$c_combinedkitchen[i],
-                                            Boane_houses_octM2$c_combinedstorageroom[i],Boane_houses_octM2$c_combinedbathroom[i],
-                                            Boane_houses_octM2$c_combinedgarage[i],Boane_houses_octM2$c_combinedother[i],na.rm=TRUE)
-    
-    Boane_houses_octM2$total_rooms_added[i] = sum(Boane_houses_octM2$c_addedanimalroom[i],Boane_houses_octM2$c_addedlivingroom[i],
-                                                  Boane_houses_octM2$c_addedbedroom[i],Boane_houses_octM2$c_addedkitchen[i],
-                                                  Boane_houses_octM2$c_addedstorageroom[i],Boane_houses_octM2$c_addedbathroom[i],
-                                                  Boane_houses_octM2$c_addedgarage[i],Boane_houses_octM2$c_addedother[i],na.rm=TRUE)
-    
-    Boane_houses_octM2$total_rooms_mod[i] = sum(Boane_houses_octM2$c_modifiedanimalroom[i],Boane_houses_octM2$c_modifiedlivingroom[i],
-                                                Boane_houses_octM2$c_modifiedbedroom[i],Boane_houses_octM2$c_modifiedkitchen[i],
-                                                Boane_houses_octM2$c_modifiedstorageroom[i],Boane_houses_octM2$c_modifiedbathroom[i],
-                                                Boane_houses_octM2$c_modifiedgarage[i],Boane_houses_octM2$c_modifiedother[i],na.rm=TRUE)
-    
-    
-  }
-  return(
-    list(
-      c(length(Boane_houses_octM2$total_rooms_mod[Boane_houses_octM2$total_rooms_mod > 0]),
-        length(Boane_houses_octM2$total_rooms_added[Boane_houses_octM2$total_rooms_added > 0])),
-      Boane_houses_octM2
-    )
-  )
-  
-}
-Boane_M2 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Boane_houses_oct$houseid,
-                                       follow_up_month = "M2")
-Boane_M3 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Boane_houses_oct$houseid,
-                                       follow_up_month = "M3")
-Boane_M4 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Boane_houses_oct$houseid,
-                                       follow_up_month = "M4")
-Boane_M5 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Boane_houses_oct$houseid,
-                                       follow_up_month = "M5")
-Boane_M6 = PULL_TOTAL_MOD_ADDED_FOR_Ms(dataInitHH = Boane_houses_oct$houseid,
-                                       follow_up_month = "M6")
-
-## For Table 1: modified rooms
-c(length(Boane_houses_oct$total_rooms_mod[Boane_houses_oct$total_rooms_mod > 0]),
-  Boane_M2[[1]][1],Boane_M3[[1]][1],Boane_M4[[1]][1],Boane_M5[[1]][1],Boane_M6[[1]][1])
-
-c(length(Boane_houses_oct$total_rooms_added[Boane_houses_oct$total_rooms_added > 0]),
-  Boane_M2[[1]][2],Boane_M3[[1]][2],Boane_M4[[1]][2],Boane_M5[[1]][2],Boane_M6[[1]][2])
-
-
-tapply(Boane_M6[[2]]$c_combinedbedroom,Boane_M6[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M6 = c(0,0,0,0,0)##5
-tapply(Boane_M6[[2]]$c_combinedlivingroom,Boane_M6[[2]]$c_modifiedlivingroom,length)
-tapply(Boane_M6[[2]]$c_combinedkitchen,Boane_M6[[2]]$c_modifiedkitchen,length)
-tapply(Boane_M6[[2]]$c_combinedstorageroom,Boane_M6[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M6 = c(0,0)##2
-modified_kitchens_M6 = c(0)##1
-modified_storage_M6 = c(0)##1
-
-tapply(Boane_M5[[2]]$c_combinedbedroom,Boane_M5[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M5 = c(0,0,0,0,0)##11
-tapply(Boane_M5[[2]]$c_combinedlivingroom,Boane_M5[[2]]$c_modifiedlivingroom,length)
-tapply(Boane_M5[[2]]$c_combinedkitchen,Boane_M5[[2]]$c_modifiedkitchen,length)
-tapply(Boane_M5[[2]]$c_combinedstorageroom,Boane_M5[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M5 = c(0,0)##2
-modified_kitchens_M5 = c(0)##1
-modified_storage_M5 = c(0)##1
-
-
-tapply(Boane_M4[[2]]$c_combinedbedroom,Boane_M4[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M4 = c(0,0,0,0,0)##11
-tapply(Boane_M4[[2]]$c_combinedlivingroom,Boane_M4[[2]]$c_modifiedlivingroom,length)
-tapply(Boane_M4[[2]]$c_combinedkitchen,Boane_M4[[2]]$c_modifiedkitchen,length)
-tapply(Boane_M4[[2]]$c_combinedstorageroom,Boane_M4[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M4 = c(0,0)##7
-modified_kitchens_M4 = c(0)##2
-modified_storage_M4 = c(0)##5
-
-
-tapply(Boane_M3[[2]]$c_combinedbedroom,Boane_M3[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M3 = c(0,1,1,0,0)##11
-tapply(Boane_M3[[2]]$c_combinedlivingroom,Boane_M3[[2]]$c_modifiedlivingroom,length)
-tapply(Boane_M3[[2]]$c_combinedkitchen,Boane_M3[[2]]$c_modifiedkitchen,length)
-tapply(Boane_M3[[2]]$c_combinedstorageroom,Boane_M3[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M3 = c(1,0)##7
-modified_kitchens_M3 = c(0)##2
-modified_storage_M3 = c(0)##5
-
-
-tapply(Boane_M2[[2]]$c_combinedbedroom,Boane_M2[[2]]$c_modifiedbedroom,length)
-modified_bedrooms_M2 = c(0,0,0,0,0)##11
-tapply(Boane_M2[[2]]$c_combinedlivingroom,Boane_M2[[2]]$c_modifiedlivingroom,length)
-tapply(Boane_M2[[2]]$c_combinedkitchen,Boane_M2[[2]]$c_modifiedkitchen,length)
-tapply(Boane_M2[[2]]$c_combinedstorageroom,Boane_M2[[2]]$c_modifiedstorageroom,length)
-modified_livingrooms_M2 = c(0,0)##7
-modified_kitchens_M2 = c(0)##2
-modified_storage_M2 = c(0)##5
-
-9/sum(Boane_houses_oct$c_combinedbedroom,na.rm = T)
-6/sum(Boane_houses_oct$c_combinedlivingroom,na.rm = T)
-
-to_plot_A = c(bedrooms,NA,livingrooms,NA,kitchens,NA,storage)
-to_plot_M6 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4+modified_bedrooms_M5+modified_bedrooms_M6,NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4+modified_livingrooms_M5+modified_livingrooms_M6,NA,modified_kitchens+modified_kitchens_M2+modified_kitchens_M3+modified_kitchens_M4+modified_kitchens_M5+modified_kitchens_M6,NA,0)
-to_plot_M5 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4+modified_bedrooms_M5,                     NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4+modified_livingrooms_M5,                        NA,modified_kitchens+modified_kitchens_M2+modified_kitchens_M3+modified_kitchens_M4+modified_kitchens_M5,                     NA,0)##GREEN
-to_plot_M4 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3+modified_bedrooms_M4,                                          NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3+modified_livingrooms_M4,                                                NA,modified_kitchens+modified_kitchens_M2+modified_kitchens_M3+modified_kitchens_M4,                                          NA,0)##RED
-to_plot_M3 = c(modified_bedrooms+modified_bedrooms_M2+modified_bedrooms_M3,                                                               NA,modified_livingrooms+modified_livingrooms_M2+modified_livingrooms_M3,                                                                        NA,modified_kitchens+modified_kitchens_M2+modified_kitchens_M3,                                                               NA,0)##BLUE
-to_plot_M2 = c(modified_bedrooms+modified_bedrooms_M2,                                                                                    NA,modified_livingrooms+modified_livingrooms_M2,                                                                                                NA,modified_kitchens+modified_kitchens_M2,                                                                                    NA,0)##PURPLE
-to_plot_M1 = c(modified_bedrooms,NA,modified_livingrooms,NA,modified_kitchens,NA,modified_storage)##ORANGE
-
-length(to_plot_A);length(to_plot_M6);length(to_plot_M5);length(to_plot_M4);length(to_plot_M3);length(to_plot_M2);length(to_plot_M1)
-
-cols_A = rep(adegenet::transp("grey",c(0.1,0.4,0.7,0.9)),c(6,3,2,2))
-
-### And added rooms?
-
-tapply(Boane_M6[[2]]$c_combinedbedroom,Boane_M6[[2]]$c_addedbedroom,length)
-added_bedrooms_M6 = c(0,0,0,0,0)##5
-tapply(Boane_M6[[2]]$c_combinedlivingroom,Boane_M6[[2]]$c_addedlivingroom,length)
-tapply(Boane_M6[[2]]$c_combinedkitchen,Boane_M6[[2]]$c_addedkitchen,length)
-tapply(Boane_M6[[2]]$c_combinedstorageroom,Boane_M6[[2]]$c_addedstorageroom,length)
-added_livingrooms_M6 = c(0,0)##2
-added_kitchens_M6 = c(1)##1
-added_storage_M6 = c(0)##1
-
-tapply(Boane_M5[[2]]$c_combinedbedroom,Boane_M5[[2]]$c_addedbedroom,length)
-added_bedrooms_M5 = c(0,0,0,0,0)##11
-tapply(Boane_M5[[2]]$c_combinedlivingroom,Boane_M5[[2]]$c_addedlivingroom,length)
-tapply(Boane_M5[[2]]$c_combinedkitchen,Boane_M5[[2]]$c_addedkitchen,length)
-tapply(Boane_M5[[2]]$c_combinedstorageroom,Boane_M5[[2]]$c_addedstorageroom,length)
-added_livingrooms_M5 = c(0,0)##2
-added_kitchens_M5 = c(0)##1
-added_storage_M5 = c(0)##1
-
-tapply(Boane_M4[[2]]$c_combinedbedroom,Boane_M4[[2]]$c_addedbedroom,length)
-added_bedrooms_M4 = c(1,0,0,0,0)##11
-tapply(Boane_M4[[2]]$c_combinedlivingroom,Boane_M4[[2]]$c_addedlivingroom,length)
-tapply(Boane_M4[[2]]$c_combinedkitchen,Boane_M4[[2]]$c_addedkitchen,length)
-tapply(Boane_M4[[2]]$c_combinedstorageroom,Boane_M4[[2]]$c_addedstorageroom,length)
-added_livingrooms_M4 = c(0,0)##7
-added_kitchens_M4 = c(0)##2
-added_storage_M4 = c(0)##5
-
-
-tapply(Boane_M3[[2]]$c_combinedbedroom,Boane_M3[[2]]$c_addedbedroom,length)
-added_bedrooms_M3 = c(1,0,0,0,0)##11
-tapply(Boane_M3[[2]]$c_combinedlivingroom,Boane_M3[[2]]$c_addedlivingroom,length)
-tapply(Boane_M3[[2]]$c_combinedkitchen,Boane_M3[[2]]$c_addedkitchen,length)
-tapply(Boane_M3[[2]]$c_combinedstorageroom,Boane_M3[[2]]$c_addedstorageroom,length)
-added_livingrooms_M3 = c(0,0)##7
-added_kitchens_M3 = c(0)##2
-added_storage_M3 = c(0)##5
-
-
-tapply(Boane_M2[[2]]$c_combinedbedroom,Boane_M2[[2]]$c_addedbedroom,length)
-added_bedrooms_M2 = c(0,0,0,0,0)##11
-tapply(Boane_M2[[2]]$c_combinedlivingroom,Boane_M2[[2]]$c_addedlivingroom,length)
-tapply(Boane_M2[[2]]$c_combinedkitchen,Boane_M2[[2]]$c_addedkitchen,length)
-tapply(Boane_M2[[2]]$c_combinedkitchen,Boane_M2[[2]]$c_addedstorageroom,length)
-added_livingrooms_M2 = c(0,0)##7
-added_kitchens_M2 = c(0)##2
-added_storage_M2 = c(0)##5
-
-## (There were no added rooms in M1)
-
-# par(mfrow=c(2,1))
-
-to_plota_M6 = c(added_bedrooms_M2+added_bedrooms_M3+added_bedrooms_M4+added_bedrooms_M5+added_bedrooms_M6,NA,added_livingrooms_M2+added_livingrooms_M3+added_livingrooms_M4+added_livingrooms_M5+added_livingrooms_M6, NA,added_kitchens_M2+added_kitchens_M3+added_kitchens_M4+added_kitchens_M5+added_kitchens_M6,NA,added_storage_M2+added_storage_M3+added_storage_M4+added_storage_M5++added_storage_M6)
-to_plota_M5 = c(added_bedrooms_M2+added_bedrooms_M3+added_bedrooms_M4+added_bedrooms_M5,                  NA,added_livingrooms_M2+added_livingrooms_M3+added_livingrooms_M4+added_livingrooms_M5,                      NA,added_kitchens_M2+added_kitchens_M3+added_kitchens_M4+added_kitchens_M5,                  NA,added_storage_M2+added_storage_M3+added_storage_M4+added_storage_M5)##GREEN
-to_plota_M4 = c(added_bedrooms_M2+added_bedrooms_M3+added_bedrooms_M4,                                    NA,added_livingrooms_M2+added_livingrooms_M3+added_livingrooms_M4,                                           NA,added_kitchens_M2+added_kitchens_M3+added_kitchens_M4,                                    NA,added_storage_M2+added_storage_M3+added_storage_M4)##RED
-to_plota_M3 = c(added_bedrooms_M2+added_bedrooms_M3,                                                      NA,added_livingrooms_M2+added_livingrooms_M3,                                                                NA,added_kitchens_M2+added_kitchens_M3,                                                      NA,added_storage_M2+added_storage_M3)##BLUE
-to_plota_M2 = c(added_bedrooms_M2,                                                                        NA,added_livingrooms_M2,                                                                                     NA,added_kitchens_M2,                                                                        NA,added_storage_M2)##PURPLE
-
-
-
-
-cols_A = rep(adegenet::transp("grey",c(0.1,0.4,0.7,0.9)),c(6,3,2,2))
-
-barplot(to_plot_A+to_plota_M6,col=cols_A,lty=2,
-        xlab="Rooms in compounds",xaxt="n",yaxt="n",
-        ylab="Frequency", main = "Boane (October cohort)")
-barplot(to_plot_A+to_plota_M5,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A+to_plota_M4,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A+to_plota_M3,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A+to_plota_M2,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_A,add=TRUE,col = adegenet::transp("grey",0.2),
-        xlab="",xaxt="n",yaxt="n",
-        ylab="", main = "")
-
-
-barplot(to_plot_M6,add=TRUE,col = adegenet::transp("yellow",0.7),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M5,add=TRUE,col = adegenet::transp("orange",0.3),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M4,add=TRUE,col = adegenet::transp("orange",0.3),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M3,add=TRUE,col = adegenet::transp("orange"),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M2,add=TRUE,col = adegenet::transp("darkred",0.7),
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-barplot(to_plot_M1,add=TRUE,col = "darkred",
-        xlab="",xaxt="n",yaxt="n",border=NA,
-        ylab="", main = "")
-axis(1,at=seq(1,14,length=12),
-     labels=c(1:5,NA,1:2,NA,1,NA,1))
-axis(2,las=2, at=c(0,10,20,30,40,50,60))
-
-abline(v=6.5,lty=2,lwd=2,col="grey20")
-text(3.2,50,"Bedrooms")
-
-abline(v=10.2,lty=2,lwd=2,col="grey20")
-text(9.2,50,"Living rooms")
-
-abline(v=13,lty=2,lwd=2,col="grey20")
-text(11.2,50,"Kitchens")
-text(14,50,"Storage rooms")
-
-
-```
-
-
-## Analysis 1
-
-The impact of any indoor residual spraying (IRS) product will be time-dependent because the active ingredient wanes after application. A systematic review of experimental hut trial data (1) has previously assessed the entomological impacts of Actellic 300CS and SumiShield, the two IRS products used here. 
-
-Results from the systematic review (1) for either Actellic 300®CS or SumiShield data are modified given the cone bioassay data reported in our study, weighted for the proportion of houses that are constructed with either mud or cement, to estimate the probable outcomes in Matutuine and Boane districts of southern Mozambique (Actellic 300®CS (main manuscript Fig. 2C & 2D), and SumiShield® (main manuscript Fig. 2E & 2F)) 
-
-
-A bayesian logistic growth model is fitted to the mortality, successful feeding and deterrence data observed in a systematic review. We provide the RStan model code below (full_model.stan). We then fit the same function to the cone bioassay mortality data measured in our study (log_model.stan) when sampling either mud or cement surfaces. 
-
-Data and simulated parameters for Analysis 1 - 3 are provided in Supplementary data
-
-```{r, include = TRUE,  eval=FALSE}
-
-
-## This is the model from the systematic review fitting to 
-## mortality
-## successful feeding
-## deterrence
-
-## full_model.stan
-// bernoulli_logistic transformed data function
-data {
-  
-  int<lower=1> N;                  // rows of data
-  
-  int<lower=0> n_t[N];             // Total number of mosquitoes entering IRS huts
-  int<lower=0> d_t[N];             // Number mosquites dead sprayed hut
-  int<lower=0> fed_t[N];           // Number of mosquitoes feeding in IRS HUTS assuming 
-                                   // equal feeding for dead and alive ones
-  int<lower=0> deterrence_IRS[N];  // Number of mosquitoes in sprayed huts
-  int<lower=0> deterrence_total[N]; //Total number of mosquitoes in both sprayed and 
-                                    //control huts
-  
-  vector<lower=0>[N] time;       // predictor
-
-}
-
-parameters {
-  //Consider death. This is the proportion of mosquitoes dying (d_t) in treated huts 
-  //(n_t)
-  real alpha1;
-  real alpha2;
-  
-  //Consider feeding. This is the proportion of mosquitoes that successfully fed  
-  //in treatment (f_t)
-  real beta1;
-  real beta2;
-  
-  //Consider feeding. This is the proportion of mosquitoes that successfully fed 
-  //in treatment (f_t)
-  real omega1;
-  real omega2;
-  
-  //  vector[N_study] study_a;
-  //  real<lower=0,upper=10> sigma;
-}
-
-model {
-  real sp[N];
-  real fp[N];
-  real det[N];
-  
-  alpha1 ~ normal(0,100);
-  alpha2 ~ normal(0,100);
-  
-  beta1 ~ normal(0,100);
-  beta2 ~ normal(0,100);
-  
-  omega1 ~ normal(0,100);
-  omega2 ~ normal(0,100);
-  
-  //  study_a ~ normal(0,sigma);
-  
-  for (n in 1:N) {
-    sp[n] = alpha1  + alpha2 * time[n];
-    fp[n] = beta1  + beta2 * time[n];
-    det[n] = omega1  + omega2 * time[n];
-  }
-  
-  d_t ~ binomial_logit(n_t, sp);
-  fed_t ~ binomial_logit(n_t, fp);
-  deterrence_IRS ~ binomial_logit(deterrence_total, det);
-}
-
-
-## This is the model adjusted here to fit to 
-## cone bioassay mortality in data from Southern Mozambique
-## log_model.stan
-// bernoulli_logistic transformed data function
-data {
-  
-  int<lower=1> N;                  // rows of data
-  
-  int<lower=0> n_t[N];             // Total number of mosquitoes counted
-  int<lower=0> d_t[N];             // Number mosquites killed during the test
-  
-  vector<lower=0>[N] time;         // time predictor e.g. months
-  
-  int<lower=1> N_eff;              // a random effect eg wall type / location / 
-                                   // mosquito species etc
-  int<lower=1, upper = N_eff> eff[N];
-  
-}
-
-parameters {
-  //Consider death. This is the proportion of mosquitoes dying (d_t) of 
-  //all tested (n_t)
-  real alpha1[N_eff];
-  real alpha2[N_eff];
-  
-}
-
-model {
-  real sp[N];
-  
-  alpha1 ~ normal(0,10);
-  alpha2 ~ normal(0,10);
-  
-  for (n in 1:N) {
-    sp[n] = alpha1[eff[n]] + alpha2[eff[n]] * time[n];
-  }
-  
-  d_t ~ binomial_logit(n_t, sp);
-}
-
-generated quantities{
-  real sp_ppc[N_eff, 365];// this is to predict for 365 time points so 
-                          // adjust time accordingly
-    
-    for(v in 1:N_eff){
-      for(t in 1:365){
-        sp_ppc[v, t] = binomial_rng(365, inv_logit(alpha1[v] + alpha2[v] * t)) / 365.0;
-      }
-    }
-}
-
-
-############################
-##
-## Estimating the probable outcome of a feeding attempt
-##
-############################
 act_dattest_base = readRDS("data_systematic_review_2018/act_dattest_base")
 ## Modelling the impact 
 stan_Acte <- rstan::stan(file="stat_models/probability_estimates_lq and kq_random_effect_mean.stan", 
-                  data=act_dattest_base, ## Data from Sherrard-Smith et al (2018) (1)
-                  warmup=1000,
-                  control = list(adapt_delta = 0.8,
-                                 max_treedepth = 20),
-                  iter=2000, chains=4)
+                         data=act_dattest_base, ## Data from Sherrard-Smith et al (2018) (1)
+                         warmup=1000,
+                         control = list(adapt_delta = 0.8,
+                                        max_treedepth = 20),
+                         iter=2000, chains=4)
 
 sum_dattest_base = readRDS("data_systematic_review_2018/sum_dattest_base")
 ## Modelling the impact 
 stan_Sumi <- rstan::stan(file="stat_models/probability_estimates_lq and kq_random_effect_mean.stan", 
-                  data=sum_dattest_base, ## Data from Sherrard-Smith et al (2018) (1)
-                  warmup=1000,
-                  control = list(adapt_delta = 0.8,
-                                 max_treedepth = 20),
-                  iter=2000, chains=4)
+                         data=sum_dattest_base, ## Data from Sherrard-Smith et al (2018) (1)
+                         warmup=1000,
+                         control = list(adapt_delta = 0.8,
+                                        max_treedepth = 20),
+                         iter=2000, chains=4)
 
 
 #library(shinystan)  ## can use this to check the model diagnostics
@@ -912,19 +62,25 @@ feed1 = (1 - mean_valssp_Acte) * mean_valsfp_Acte * (1 - mean_valsdet_Acte)
 death1 = mean_valssp_Acte * (1 - mean_valsdet_Acte)
 rep1 = (1 - (death1 + feed1)) * (1 - mean_valsdet_Acte)
 deter1 = mean_valsdet_Acte  
-  
+
 TOTS = feed1 + rep1 + death1 + deter1
-  
+
+feed1a = (1 - mean_valssp_Sumi) * mean_valsfp_Sumi * (1 - mean_valsdet_Sumi)
+death1a = mean_valssp_Sumi * (1 - mean_valsdet_Sumi)
+rep1a = (1 - (death1a + feed1a)) * (1 - mean_valsdet_Sumi)
+deter1a = mean_valsdet_Sumi  
+
+TOTSa = feed1a + rep1a + death1a + deter1a
+
 first_line = feed1 / TOTS
 second_line = (feed1 + rep1) / TOTS
 third_line = (feed1 + rep1 + deter1 ) / TOTS
-  
+
 Time = 1:365
 Time2 = rev(Time)
 minimal = rep(0,length(Time))
 maximal = rep(1,length(Time))
 
-##organophosphate
 plot(rev(first_line) ~ Time2,ylim=c(0,1),yaxt="n",
      ylab="Probable outcome (%)",xlab="Time in days",xaxt="n",
      main="Systematic review",
@@ -936,7 +92,7 @@ polygon(c(Time2,rev(Time2)),c(rev(second_line),first_line),col=adegenet::transp(
 polygon(c(Time2,rev(Time2)),c(rev(third_line),second_line),col=adegenet::transp("darkgreen",0.4),border = NA)
 polygon(c(Time2,rev(Time2)),c(maximal,third_line),col=adegenet::transp("royalblue",0.6),border = NA)
 
-## Or neonicotinoid
+
 first_line = feed1a / TOTSa
 second_line = (feed1a + rep1a) / TOTSa
 third_line = (feed1a + rep1a + deter1a ) / TOTSa
@@ -957,23 +113,6 @@ polygon(c(Time2,rev(Time2)),c(rev(second_line),first_line),col=adegenet::transp(
 polygon(c(Time2,rev(Time2)),c(rev(third_line),second_line),col=adegenet::transp("darkgreen",0.4),border = NA)
 polygon(c(Time2,rev(Time2)),c(maximal,third_line),col=adegenet::transp("royalblue",0.6),border = NA)
 
-
-## Plotting these produces part of Figure 2 main manuscript
-
-```
-
-We then estimate the weighted-average mortality impact on mosquitoes given the ratio of mud vs cement walls in Matutuine or Boane.
-
-These outcomes are then combined with the systematic review to give us a method to track the waning entomological impact (on mosquito mortality, successful blood-feeding and deterrence) of the spray products over time since a household was treated.
-
-The results are shown in Figure 5 main manuscript.
-
-```{r echo=TRUE,  eval=FALSE}
-####################################################################
-##
-## 1 Cone bioassay data from the field 
-##
-#####################################################################
 
 NEW_DAT = read.csv("data_cone_bioassay\\raw_data_2016_2017.csv",header=TRUE)
 NEW_DAT$total_exposed = NEW_DAT$exposed_mosquito_1 + NEW_DAT$exposed_mosquito_2 + 
@@ -1053,7 +192,7 @@ for(m in 1:length(unique(cone_bios$month_official))){
 }
 
 
-  ## Add in a line to demonstrate the residual efficacy estimated by Mercy in MOZAMBIQUE
+## Add in a line to demonstrate the residual efficacy estimated by Mercy in MOZAMBIQUE
 
 N_data = 12
 Con_bio_d_t_mud = Con_bio_Acte_d_t_mud[1:12]
@@ -1062,75 +201,75 @@ Con_bio_d_t_cem = Con_bio_Acte_d_t_cem[1:12]
 Con_bio_n_t_cem= Con_bio_Acte_n_t_cem[1:12]
 time_sequence = c(1:12)*30
 
-  data_list_mud = list(N = N_data, ## number
-                   d_t = Con_bio_d_t_mud,## repeat for each chemistry
-                   n_t = Con_bio_n_t_mud,
-                   time = time_sequence,
-                   N_eff = 1, ## eg '2' for 2 wall types
-                   eff = rep(1,N_data))##[the number of reps for each group in your data]
-  
-  data_list_cem = list(N = N_data, ## number
-                       d_t = Con_bio_d_t_cem,
-                       n_t = Con_bio_n_t_cem,
-                       time = time_sequence,
-                       N_eff = 1, ## eg '2' for 2 wall types
-                       eff = rep(1,N_data))##[the number of reps for each group in your data]
-  
-  
-  stan_model_mud <- stan(file="stat_models/log_mod.stan", 
-                     data=data_list_mud, 
-                     warmup=500,
-                     control = list(adapt_delta = 0.9,
-                                    max_treedepth = 20),
-                     iter=1000, chains=4)
-  
-  stan_model_cem <- stan(file="stat_models/log_mod.stan", 
-                         data=data_list_cem, 
-                         warmup=500,
-                         control = list(adapt_delta = 0.9,
-                                        max_treedepth = 20),
-                         iter=1000, chains=4)
+data_list_mud = list(N = N_data, ## number
+                     d_t = Con_bio_d_t_mud,## repeat for each chemistry
+                     n_t = Con_bio_n_t_mud,
+                     time = time_sequence,
+                     N_eff = 1, ## eg '2' for 2 wall types
+                     eff = rep(1,N_data))##[the number of reps for each group in your data]
 
-  base_moz1 <- extract(stan_model_mud) ## can use this to extract the model parameter estimates
-  base_moz2 <- extract(stan_model_cem) ## can use this to extract the model parameter estimates
-  
-  ## plot it against your data!
-  d_t1 = Con_bio_d_t_mud
-  n_t1 = Con_bio_n_t_mud
-  DEAD1 = d_t1/n_t1
-  
-  d_t2 = Con_bio_d_t_cem
-  n_t2 = Con_bio_n_t_cem
-  DEAD2 = d_t2/n_t2
+data_list_cem = list(N = N_data, ## number
+                     d_t = Con_bio_d_t_cem,
+                     n_t = Con_bio_n_t_cem,
+                     time = time_sequence,
+                     N_eff = 1, ## eg '2' for 2 wall types
+                     eff = rep(1,N_data))##[the number of reps for each group in your data]
 
-  time = seq(1,365,by=1)
-  
-  mean_prediction_mud = 1 / (1 + exp(-mean(base_moz1$alpha1[,1]) - 
-                                       mean(base_moz1$alpha2[,1])*time))
-  max_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.9) - 
-                                      quantile(base_moz1$alpha2[,1],0.9)*time))
-  min_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.1) - 
-                                      quantile(base_moz1$alpha2[,1],0.1)*time))
-  
-  mean_prediction_cem = 1 / (1 + exp(-mean(base_moz2$alpha1[,1]) - 
-                                       mean(base_moz2$alpha2[,1])*time))
-  max_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.9) - 
-                                      quantile(base_moz2$alpha2[,1],0.9)*time))
-  min_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.1) - 
-                                      quantile(base_moz2$alpha2[,1],0.1)*time))
-  
-  ## Plotting these produces part of Figure 2 main manuscript
 
-  
-  ## The mean prediction is weighted by the proportion of households
-  ## with mud or cement walls in each village
-  
-  ## percent_mud: 40% for Matutuine, 97% for Boane
-  ## percent_cem: 60% for Matutuine,  3% for Boane
-  
-  ##e.g for Matuttuine
-  PERCENT_MUD = 0.40
-  PERCENT_CEM = 0.60
+stan_model_mud <- stan(file="stat_models/log_mod.stan", 
+                       data=data_list_mud, 
+                       warmup=500,
+                       control = list(adapt_delta = 0.9,
+                                      max_treedepth = 20),
+                       iter=1000, chains=4)
+
+stan_model_cem <- stan(file="stat_models/log_mod.stan", 
+                       data=data_list_cem, 
+                       warmup=500,
+                       control = list(adapt_delta = 0.9,
+                                      max_treedepth = 20),
+                       iter=1000, chains=4)
+
+base_moz1 <- extract(stan_model_mud) ## can use this to extract the model parameter estimates
+base_moz2 <- extract(stan_model_cem) ## can use this to extract the model parameter estimates
+
+## plot it against your data!
+d_t1 = Con_bio_d_t_mud
+n_t1 = Con_bio_n_t_mud
+DEAD1 = d_t1/n_t1
+
+d_t2 = Con_bio_d_t_cem
+n_t2 = Con_bio_n_t_cem
+DEAD2 = d_t2/n_t2
+
+time = seq(1,365,by=1)
+
+mean_prediction_mud = 1 / (1 + exp(-mean(base_moz1$alpha1[,1]) - 
+                                     mean(base_moz1$alpha2[,1])*time))
+max_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.9) - 
+                                    quantile(base_moz1$alpha2[,1],0.9)*time))
+min_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.1) - 
+                                    quantile(base_moz1$alpha2[,1],0.1)*time))
+
+mean_prediction_cem = 1 / (1 + exp(-mean(base_moz2$alpha1[,1]) - 
+                                     mean(base_moz2$alpha2[,1])*time))
+max_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.9) - 
+                                    quantile(base_moz2$alpha2[,1],0.9)*time))
+min_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.1) - 
+                                    quantile(base_moz2$alpha2[,1],0.1)*time))
+
+## Plotting these produces part of Figure 2 main manuscript
+
+
+## The mean prediction is weighted by the proportion of households
+## with mud or cement walls in each village
+
+## percent_mud: 40% for Matutuine, 97% for Boane
+## percent_cem: 60% for Matutuine,  3% for Boane
+
+##e.g for Matuttuine
+PERCENT_MUD = 0.40
+PERCENT_CEM = 0.60
 
 percent_mud = PERCENT_MUD
 percent_cem = PERCENT_CEM
@@ -1157,67 +296,75 @@ Con_bio_d_t_cem = Con_bio_Sumi_d_t_cem[1:12]
 Con_bio_n_t_cem= Con_bio_Sumi_n_t_cem[1:12]
 time_sequence = c(1:12)*30
 
-  data_list_mud = list(N = N_data, ## number
-                   d_t = Con_bio_d_t_mud,## repeat for each chemistry
-                   n_t = Con_bio_n_t_mud,
-                   time = time_sequence,
-                   N_eff = 1, ## eg '2' for 2 wall types
-                   eff = rep(1,N_data))##[the number of reps for each group in your data]
-  
-  data_list_cem = list(N = N_data, ## number
-                       d_t = Con_bio_d_t_cem,
-                       n_t = Con_bio_n_t_cem,
-                       time = time_sequence,
-                       N_eff = 1, ## eg '2' for 2 wall types
-                       eff = rep(1,N_data))##[the number of reps for each group in your data]
-  
-  
-  stan_model_mud <- stan(file="stat_models/log_mod.stan", 
-                     data=data_list_mud, 
-                     warmup=500,
-                     control = list(adapt_delta = 0.9,
-                                    max_treedepth = 20),
-                     iter=1000, chains=4)
-  
-  stan_model_cem <- stan(file="stat_models/log_mod.stan", 
-                         data=data_list_cem, 
-                         warmup=500,
-                         control = list(adapt_delta = 0.9,
-                                        max_treedepth = 20),
-                         iter=1000, chains=4)
+data_list_mud = list(N = N_data, ## number
+                     d_t = Con_bio_d_t_mud,## repeat for each chemistry
+                     n_t = Con_bio_n_t_mud,
+                     time = time_sequence,
+                     N_eff = 1, ## eg '2' for 2 wall types
+                     eff = rep(1,N_data))##[the number of reps for each group in your data]
 
-  base_moz1 <- extract(stan_model_mud) ## can use this to extract the model parameter estimates
-  base_moz2 <- extract(stan_model_cem) ## can use this to extract the model parameter estimates
-  
-  ## plot it against your data!
-  time = seq(1,365,by=1)
-  
-  mean_prediction_mud = 1 / (1 + exp(-mean(base_moz1$alpha1[,1]) - 
-                                       mean(base_moz1$alpha2[,1])*time))
-  max_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.9) - 
-                                      quantile(base_moz1$alpha2[,1],0.9)*time))
-  min_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.1) - 
-                                      quantile(base_moz1$alpha2[,1],0.1)*time))
-  
-  mean_prediction_cem = 1 / (1 + exp(-mean(base_moz2$alpha1[,1]) - 
-                                       mean(base_moz2$alpha2[,1])*time))
-  max_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.9) - 
-                                      quantile(base_moz2$alpha2[,1],0.9)*time))
-  min_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.1) - 
-                                      quantile(base_moz2$alpha2[,1],0.1)*time))
-  
-  ## Plotting these produces part of Figure 2 main manuscript
+data_list_cem = list(N = N_data, ## number
+                     d_t = Con_bio_d_t_cem,
+                     n_t = Con_bio_n_t_cem,
+                     time = time_sequence,
+                     N_eff = 1, ## eg '2' for 2 wall types
+                     eff = rep(1,N_data))##[the number of reps for each group in your data]
 
-  
-  ## The mean prediction is weighted by the proportion of households
-  ## with mud or cement walls in each village
-  
-  ## percent_mud: 40% for Matutuine, 97% for Boane
-  ## percent_cem: 60% for Matutuine,  3% for Boane
 
-  ##e.g for Matuttuine
-  PERCENT_MUD = 0.40
-  PERCENT_CEM = 0.60
+stan_model_mud <- stan(file="stat_models/log_mod.stan", 
+                       data=data_list_mud, 
+                       warmup=500,
+                       control = list(adapt_delta = 0.9,
+                                      max_treedepth = 20),
+                       iter=1000, chains=4)
+
+stan_model_cem <- stan(file="stat_models/log_mod.stan", 
+                       data=data_list_cem, 
+                       warmup=500,
+                       control = list(adapt_delta = 0.9,
+                                      max_treedepth = 20),
+                       iter=1000, chains=4)
+
+base_moz1 <- extract(stan_model_mud) ## can use this to extract the model parameter estimates
+base_moz2 <- extract(stan_model_cem) ## can use this to extract the model parameter estimates
+
+## plot it against your data!
+d_t1 = Con_bio_d_t_mud
+n_t1 = Con_bio_n_t_mud
+DEAD1 = d_t1/n_t1
+
+d_t2 = Con_bio_d_t_cem
+n_t2 = Con_bio_n_t_cem
+DEAD2 = d_t2/n_t2
+
+time = seq(1,365,by=1)
+
+mean_prediction_mud = 1 / (1 + exp(-mean(base_moz1$alpha1[,1]) - 
+                                     mean(base_moz1$alpha2[,1])*time))
+max_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.9) - 
+                                    quantile(base_moz1$alpha2[,1],0.9)*time))
+min_prediction_mud = 1 / (1 + exp(-quantile(base_moz1$alpha1[,1],0.1) - 
+                                    quantile(base_moz1$alpha2[,1],0.1)*time))
+
+mean_prediction_cem = 1 / (1 + exp(-mean(base_moz2$alpha1[,1]) - 
+                                     mean(base_moz2$alpha2[,1])*time))
+max_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.9) - 
+                                    quantile(base_moz2$alpha2[,1],0.9)*time))
+min_prediction_cem = 1 / (1 + exp(-quantile(base_moz2$alpha1[,1],0.1) - 
+                                    quantile(base_moz2$alpha2[,1],0.1)*time))
+
+## Plotting these produces part of Figure 2 main manuscript
+
+
+## The mean prediction is weighted by the proportion of households
+## with mud or cement walls in each village
+
+## percent_mud: 40% for Matutuine, 97% for Boane
+## percent_cem: 60% for Matutuine,  3% for Boane
+
+##e.g for Matuttuine
+PERCENT_MUD = 0.40
+PERCENT_CEM = 0.60
 
 percent_mud = PERCENT_MUD
 percent_cem = PERCENT_CEM
@@ -1253,25 +400,20 @@ dta1 = data.frame(
 )
 
 
-```
+actellic_details = dta1[,1:7]
+sumishield_details = dta1[,c(1,8:13)]
 
+write.csv(actellic_details,"data_generated_analysis_3/actellic_details.csv")
+write.csv(sumishield_details,"data_generated_analysis_3/sumishield_details.csv")
 
-## Analysis 2
-
-The time-dependent efficacy from LLINs is estimated similarly following (2). The successful biting (s_ITN), repeating (r_ITN), and killing (d_ITN) in the presence of LLINs also wanes with time as determined from systematic review of experimental hut data testing unwashed and washed pyrethroid treated mosquito nets (ITNs). We assume the performance of ITNs will be equivalent to nets aged 1.5 years as the mass campaign took place in 2016 - 2017 in Southern Mozambique. 
-
-```{r echo = TRUE, eval = FALSE}
 
 ##############################
 ##
-## 2 Estimated impact of ITNs, from Churcher et al. 2016 (2)
+## 3 Estimated impact of ITNs, from Churcher et al. 2016
 ##
 ###############################
-
-
-## The following parameters are taken from (Churcher et al 2016 (2))		
-##
-species =  1 ##  species parameters are generic as we do not yet have enough info
+is.pbo = 0 #says whether pbo net (0 = standard, 1= PBO)
+species =  1 ##  species parameters are generic as we do not yet have enough info!
 metric = 1 #1 = best guess, 2= lower 95% confidence interval 3 upper
 
 #Assay to hut mortality conversion		
@@ -1393,56 +535,8 @@ d_ITN = ERG_d_ITN0 * ITN_decay 	 		## insecticide mortality rate
 r_ITN = r_ITN_min + (ERG_r_ITN0 - r_ITN_min)*ITN_decay 
 s_ITN = 1 - d_ITN - r_ITN			## successful protected human biting 
 
-itn_half_life = 2.64
+# d_ITN;r_ITN;s_ITN
 
-d_ITN0 <- 0.51
-s_ITN0 <- 0.31
-r_ITN0 <- 1-d_ITN0-s_ITN0
-
-itn_loss = log(2)/itn_half_life
-
-ITN_interval=3*365
-
-
-## decay in efficacy of net over time
-#time=1:(365*3)
-ITN_decay = exp(-(time/ITN_interval)*itn_loss)
-
-r_ITN_min=0.24 
-d_ITN = ERG_d_ITN0 * ITN_decay 	 		## insecticide mortality rate 
-r_ITN = r_ITN_min + (ERG_r_ITN0 - r_ITN_min)*ITN_decay 
-s_ITN = 1 - d_ITN - r_ITN			## successful protected human biting 
-
-
-
-```
-
-
-## Analysis 3
-
-
-To quantify the impact of post-spray wall modification, prolonged spray campaigns, and IRS efficacy on IRS effectiveness, we adapt a mechanistic vector model approach determined in Le Menach 2007 (3) and Griffin et al (2010) (4) and updated in Walker et al 2016 (5). This model outlines how indoor interventions are affecting the number of mosquito bites received per person per time unit which has ramifications for the infectious mosquito bites received per person per year (the entomological inoculation rate, EIR) and malaria transmission. The probability that a blood-seeking mosquito successfully feeds will depend on the species-specific bionomics and behaviors of the mosquito (e.g. the proportion of bites taken on humans, the proportion of bites received indoors or in bed) and the vector interventions that protect the human population. 
-
-In our case, in the absence of locally available mosquito bionomics data, we use a sensitivity analyis ranging estimates for the probability of a mosquito biting indoors from 0.68 to 0.99, and a mosquito biting in bed from 0.6 to 0.95 following ranges observed in Sherrard-Smith et al (2019) (6) for these parameters. These estimates are coupled with the 80% uncertainty intervals from the posterior draws for the estimation of efficacy of IRS in Analysis 1 above. 
-
-
-```{r echo = TRUE, eval = FALSE}
-
-## These are the Bayesian posterior draws for IRS impact
-actellic_details = dta1[,1:7]
-sumishield_details = dta1[,c(1,8:13)]
-
-
-## We investigate impacts as per
-
-##  1 the effect if there is no intervention
-##  2 with ITNs only
-##  3 with IRS only no loss in coverage
-##  4 with IRS only loss in coverage
-
-## And repeat for loss in coverage
-
-## Figure 6 main manuscript
 par(mfrow = c(2,3))
 
 
@@ -1550,29 +644,29 @@ for(j in 1:3){
     PHI_B = PHI_B_mut[j]
     PHI_I = PHI_I_mut[j]
     
-  w_Sumi[i,2,1+cl[j]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
-  ## probability of surviving biting given that there is ITN
-  w_Sumi[i,3,1+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Sumi[i])*s_IRS_Sumi[i]	
-  ##			probability of surviving biting given that there is IRS
-  w_Sumi[i,4,1+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumi[i])*s_ITN[i+547]*s_IRS_Sumi[i] + 
-    (PHI_I - PHI_B)*(1-r_IRS_Sumi[i])*s_IRS_Sumi[i] 
-  ## probability of surviving biting given that there is ITN & IRS
-
-  w_Sumi[i,2,2+cl[j]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
-  ## probability of surviving biting given that there is ITN
-  w_Sumi[i,3,2+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Sumil[i])*s_IRS_Sumil[i]	
-  ##			probability of surviving biting given that there is IRS
-  w_Sumi[i,4,2+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumil[i])*s_ITN[i+547]*s_IRS_Sumil[i] + 
-    (PHI_I - PHI_B)*(1-r_IRS_Sumil[i])*s_IRS_Sumil[i] 
-  ## probability of surviving biting given that there is ITN & IRS
-
-  w_Sumi[i,2,3+cl[j]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
-  ## probability of surviving biting given that there is ITN
-  w_Sumi[i,3,3+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Sumiu[i])*s_IRS_Sumiu[i]	
-  ##			probability of surviving biting given that there is IRS
-  w_Sumi[i,4,3+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumiu[i])*s_ITN[i+547]*s_IRS_Sumiu[i] + 
-    (PHI_I - PHI_B)*(1-r_IRS_Sumiu[i])*s_IRS_Sumiu[i] 
-  ## probability of surviving biting given that there is ITN & IRS
+    w_Sumi[i,2,1+cl[j]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
+    ## probability of surviving biting given that there is ITN
+    w_Sumi[i,3,1+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Sumi[i])*s_IRS_Sumi[i]	
+    ##			probability of surviving biting given that there is IRS
+    w_Sumi[i,4,1+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumi[i])*s_ITN[i+547]*s_IRS_Sumi[i] + 
+      (PHI_I - PHI_B)*(1-r_IRS_Sumi[i])*s_IRS_Sumi[i] 
+    ## probability of surviving biting given that there is ITN & IRS
+    
+    w_Sumi[i,2,2+cl[j]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
+    ## probability of surviving biting given that there is ITN
+    w_Sumi[i,3,2+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Sumil[i])*s_IRS_Sumil[i]	
+    ##			probability of surviving biting given that there is IRS
+    w_Sumi[i,4,2+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumil[i])*s_ITN[i+547]*s_IRS_Sumil[i] + 
+      (PHI_I - PHI_B)*(1-r_IRS_Sumil[i])*s_IRS_Sumil[i] 
+    ## probability of surviving biting given that there is ITN & IRS
+    
+    w_Sumi[i,2,3+cl[j]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
+    ## probability of surviving biting given that there is ITN
+    w_Sumi[i,3,3+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Sumiu[i])*s_IRS_Sumiu[i]	
+    ##			probability of surviving biting given that there is IRS
+    w_Sumi[i,4,3+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumiu[i])*s_ITN[i+547]*s_IRS_Sumiu[i] + 
+      (PHI_I - PHI_B)*(1-r_IRS_Sumiu[i])*s_IRS_Sumiu[i] 
+    ## probability of surviving biting given that there is ITN & IRS
   }
 }
 
@@ -1586,19 +680,19 @@ yy_Sumi[,2,] = w_Sumi[,2,]
 
 for(j in 1:3){
   for(i in 1:180){
-  PHI_B = PHI_B_mut[j]
-  PHI_I = PHI_I_mut[j]
-  yy_Acte[i,3,1+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Acte[i])
-  yy_Acte[i,4,1+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Acte[i])*s_ITN[i+547] + 
-    (PHI_I - PHI_B)*(1-r_IRS_Acte[i])
-
-  yy_Acte[i,3,2+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Actel[i])
-  yy_Acte[i,4,2+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Actel[i])*s_ITN[i+547] + 
-    (PHI_I - PHI_B)*(1-r_IRS_Actel[i])
-
-  yy_Acte[i,3,3+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Acteu[i])
-  yy_Acte[i,4,3+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Acteu[i])*s_ITN[i+547] + 
-    (PHI_I - PHI_B)*(1-r_IRS_Acteu[i])
+    PHI_B = PHI_B_mut[j]
+    PHI_I = PHI_I_mut[j]
+    yy_Acte[i,3,1+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Acte[i])
+    yy_Acte[i,4,1+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Acte[i])*s_ITN[i+547] + 
+      (PHI_I - PHI_B)*(1-r_IRS_Acte[i])
+    
+    yy_Acte[i,3,2+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Actel[i])
+    yy_Acte[i,4,2+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Actel[i])*s_ITN[i+547] + 
+      (PHI_I - PHI_B)*(1-r_IRS_Actel[i])
+    
+    yy_Acte[i,3,3+cl[j]] = 1 - PHI_I + PHI_I*(1-r_IRS_Acteu[i])
+    yy_Acte[i,4,3+cl[j]] = 1 - PHI_I + PHI_B*(1-r_IRS_Acteu[i])*s_ITN[i+547] + 
+      (PHI_I - PHI_B)*(1-r_IRS_Acteu[i])
   }
 }
 
@@ -1631,10 +725,10 @@ axis(1,at=seq(-60,150,30)+15,labels = c("Sep","Oct","Nov","Dec","Jan","Feb","Mar
      cex.axis = 1.4)
 
 colsd=c("darkred","red","orange","blue")
-  for(i in 3){
-    lines(yy_Acte[,i,1] ~ time[1:180],col="darkblue",lwd=2)
-    lines(yy_Sumi[,i,1] ~ time[1:180],col="aquamarine3",lwd=2)
-  }
+for(i in 3){
+  lines(yy_Acte[,i,1] ~ time[1:180],col="darkblue",lwd=2)
+  lines(yy_Sumi[,i,1] ~ time[1:180],col="aquamarine3",lwd=2)
+}
 
 
 ## Including max uncertainty for phiI, phiB and efficacy
@@ -1680,35 +774,35 @@ for(j in 1:3){
   for(i in 1:180){
     PHI_B = PHI_B_boa[j]
     PHI_I = PHI_I_boa[j]
-
-  z_Acte[i,2,1+cl[j]] = PHI_B*r_ITN[i+547]
-  z_Acte[i,3,1+cl[j]] = PHI_I*r_IRS_Acte[i]
-  z_Acte[i,4,1+cl[j]] = PHI_B*(r_IRS_Acte[i] + (1-r_IRS_Acte[i])*r_ITN[i+547]) + (PHI_I - PHI_B)*r_IRS_Acte[i]
-
-  z_Acte[i,2,2+cl[j]] = PHI_B*r_ITN[i+547]
-  z_Acte[i,3,2+cl[j]] = PHI_I*r_IRS_Actel[i]
-  z_Acte[i,4,2+cl[j]] = PHI_B*(r_IRS_Actel[i] + (1-r_IRS_Actel[i])*r_ITN[i+547]) + 
-    (PHI_I - PHI_B)*r_IRS_Actel[i]
-
-  z_Acte[i,2,3+cl[j]] = PHI_B*r_ITN[i+547]
-  z_Acte[i,3,3+cl[j]] = PHI_I*r_IRS_Acteu[i]
-  z_Acte[i,4,3+cl[j]] = PHI_B*(r_IRS_Acteu[i] + (1-r_IRS_Acteu[i])*r_ITN[i+547]) + 
-    (PHI_I - PHI_B)*r_IRS_Acteu[i]
-  
-  z_Sumi[i,2,1+cl[j]] = PHI_B*r_ITN[i+547]
-  z_Sumi[i,3,1+cl[j]] = PHI_I*r_IRS_Sumi[i]
-  z_Sumi[i,4,1+cl[j]] = PHI_B*(r_IRS_Sumi[i] + (1-r_IRS_Sumi[i])*r_ITN[i+547]) + 
-    (PHI_I - PHI_B)*r_IRS_Sumi[i]
-
-  z_Sumi[i,2,2+cl[j]] = PHI_B*r_ITN[i+547]
-  z_Sumi[i,3,2+cl[j]] = PHI_I*r_IRS_Sumil[i]
-  z_Sumi[i,4,2+cl[j]] = PHI_B*(r_IRS_Sumil[i] + (1-r_IRS_Sumil[i])*r_ITN[i+547]) + 
-    (PHI_I - PHI_B)*r_IRS_Sumil[i]
-
-  z_Sumi[i,2,3+cl[j]] = PHI_B*r_ITN[i+547]
-  z_Sumi[i,3,3+cl[j]] = PHI_I*r_IRS_Sumiu[i]
-  z_Sumi[i,4,3+cl[j]] = PHI_B*(r_IRS_Sumiu[i] + (1-r_IRS_Sumiu[i])*r_ITN[i+547]) + 
-    (PHI_I - PHI_B)*r_IRS_Sumiu[i]
+    
+    z_Acte[i,2,1+cl[j]] = PHI_B*r_ITN[i+547]
+    z_Acte[i,3,1+cl[j]] = PHI_I*r_IRS_Acte[i]
+    z_Acte[i,4,1+cl[j]] = PHI_B*(r_IRS_Acte[i] + (1-r_IRS_Acte[i])*r_ITN[i+547]) + (PHI_I - PHI_B)*r_IRS_Acte[i]
+    
+    z_Acte[i,2,2+cl[j]] = PHI_B*r_ITN[i+547]
+    z_Acte[i,3,2+cl[j]] = PHI_I*r_IRS_Actel[i]
+    z_Acte[i,4,2+cl[j]] = PHI_B*(r_IRS_Actel[i] + (1-r_IRS_Actel[i])*r_ITN[i+547]) + 
+      (PHI_I - PHI_B)*r_IRS_Actel[i]
+    
+    z_Acte[i,2,3+cl[j]] = PHI_B*r_ITN[i+547]
+    z_Acte[i,3,3+cl[j]] = PHI_I*r_IRS_Acteu[i]
+    z_Acte[i,4,3+cl[j]] = PHI_B*(r_IRS_Acteu[i] + (1-r_IRS_Acteu[i])*r_ITN[i+547]) + 
+      (PHI_I - PHI_B)*r_IRS_Acteu[i]
+    
+    z_Sumi[i,2,1+cl[j]] = PHI_B*r_ITN[i+547]
+    z_Sumi[i,3,1+cl[j]] = PHI_I*r_IRS_Sumi[i]
+    z_Sumi[i,4,1+cl[j]] = PHI_B*(r_IRS_Sumi[i] + (1-r_IRS_Sumi[i])*r_ITN[i+547]) + 
+      (PHI_I - PHI_B)*r_IRS_Sumi[i]
+    
+    z_Sumi[i,2,2+cl[j]] = PHI_B*r_ITN[i+547]
+    z_Sumi[i,3,2+cl[j]] = PHI_I*r_IRS_Sumil[i]
+    z_Sumi[i,4,2+cl[j]] = PHI_B*(r_IRS_Sumil[i] + (1-r_IRS_Sumil[i])*r_ITN[i+547]) + 
+      (PHI_I - PHI_B)*r_IRS_Sumil[i]
+    
+    z_Sumi[i,2,3+cl[j]] = PHI_B*r_ITN[i+547]
+    z_Sumi[i,3,3+cl[j]] = PHI_I*r_IRS_Sumiu[i]
+    z_Sumi[i,4,3+cl[j]] = PHI_B*(r_IRS_Sumiu[i] + (1-r_IRS_Sumiu[i])*r_ITN[i+547]) + 
+      (PHI_I - PHI_B)*r_IRS_Sumiu[i]
   }
 }
 ## 
@@ -1762,34 +856,34 @@ w_Acte1 = yy_Acte1 = z_Acte1 = w_Sumi1 = yy_Sumi1 = z_Sumi1 = array(dim=c(365,18
 
 ## Data from spray campaign
 prop_houses_sprayed_WeeklyB = 0.97*c(0,	0.027219794,	## August
-                                0.077014558,	0.136261919,	0.196901742,	0.250817066, ## Sept
-                                0.301047746,	0.347687015,	0.395348206,	0.464541108, ## Oct
-                                0.521818166,	0.581372602,	0.643327061,	0.710948828, ## Nov
-                                0.777620537,	0.847130239,	0.911498024,	0.930365931, ## Dec
-                                0.947042313,	0.96389906,	0.983400068,	0.991357264,	 ## Jan
-                                0.99238783,	1) ## Feb
+                                     0.077014558,	0.136261919,	0.196901742,	0.250817066, ## Sept
+                                     0.301047746,	0.347687015,	0.395348206,	0.464541108, ## Oct
+                                     0.521818166,	0.581372602,	0.643327061,	0.710948828, ## Nov
+                                     0.777620537,	0.847130239,	0.911498024,	0.930365931, ## Dec
+                                     0.947042313,	0.96389906,	0.983400068,	0.991357264,	 ## Jan
+                                     0.99238783,	1) ## Feb
 prop_houses_sprayed_WeeklyM = 0.96*c(0.065358837,	0.193716785,## August
-                                0.334444596,	0.432141444,	0.533708885,	0.614060416,##sep
-                                0.667531537,	0.711462198,	0.769981823,	0.880751007,##oct
-                                0.919045204,	0.944027976,	0.97443187,	0.990922736,  ##nov
-                                0.991873307,	0.99744169,	 1,             1,          ##dec
-                                1,        1) ## jan
+                                     0.334444596,	0.432141444,	0.533708885,	0.614060416,##sep
+                                     0.667531537,	0.711462198,	0.769981823,	0.880751007,##oct
+                                     0.919045204,	0.944027976,	0.97443187,	0.990922736,  ##nov
+                                     0.991873307,	0.99744169,	 1,             1,          ##dec
+                                     1,        1) ## jan
 
 ksA = lsA = jsA = array(dim=c(365,18,9))
 for(w in 1:17){
   ksA[,1,1] =  actellic_details[,5][1:365]
   ksA[,w+1,1] = c(rep(k0,w*7),actellic_details[,5][1:(365-7*w)])
-
+  
   ksA[,1,2] =  actellic_details[,6][1:365]
   ksA[,w+1,2] = c(rep(k0,w*7),actellic_details[,6][1:(365-7*w)])
-
+  
   ksA[,1,3] =  actellic_details[,7][1:365]
   ksA[,w+1,3] = c(rep(k0,w*7),actellic_details[,7][1:(365-7*w)])
   
   
   lsA[,1,1] = actellic_details[,2]
   lsA[,w+1,1] = c(rep(0,w*7),actellic_details[,2][1:(365-7*w)])
-
+  
   lsA[,1,2] = actellic_details[,3]
   lsA[,w+1,2] = c(rep(0,w*7),actellic_details[,3][1:(365-7*w)])
   
@@ -1820,7 +914,7 @@ for(j in 1:9){
   for(w in 1:18){
     s_IRS_Acte1[,w,j] = ksA[,w,j]/k0 ##feed2 = when IRS is implemented in month 1 (Nov)
     r_IRS_Acte1[,w,j] = (1 - ksA[,w,j]/k0)*(jsA[,w,j]/(lsA[,w,j]+jsA[,w,j])) ##rep2 
-
+    
   }
   
 }
@@ -1834,20 +928,20 @@ for(w in 1:17){
   
   ksS[,1,2] =  sumishield_details[,6][1:365]
   ksS[,w+1,2] = c(rep(k0,w*7),sumishield_details[,6][1:(365-7*w)])
-
+  
   ksS[,1,3] =  sumishield_details[,7][1:365]
   ksS[,w+1,3] = c(rep(k0,w*7),sumishield_details[,7][1:(365-7*w)])
-
+  
   
   lsS[,1,1] = sumishield_details[,2]
   lsS[,w+1,1] = c(rep(0,w*7),sumishield_details[,2][1:(365-7*w)])
   
   lsS[,1,2] = sumishield_details[,3]
   lsS[,w+1,2] = c(rep(0,w*7),sumishield_details[,3][1:(365-7*w)])
-
+  
   lsS[,1,3] = sumishield_details[,4]
   lsS[,w+1,3] = c(rep(0,w*7),sumishield_details[,4][1:(365-7*w)])
-
+  
   
   jsS[,w,1] = 1 - ksS[,w,1] - lsS[,w,1]
   jsS[,w,2] = 1 - ksS[,w,2] - lsS[,w,2]
@@ -1869,8 +963,8 @@ jsS[,18,] = 1 - ksS[,18,] - lsS[,18,]
 s_IRS_Sumi1 = r_IRS_Sumi1 = array(dim=c(365,18,9))
 for(j in 1:9){
   for(w in 1:18){
-  s_IRS_Sumi1[,w,j] = ksS[,w,j]/k0 ##feed2 = when IRS is implemented in month 1 (Nov)
-  r_IRS_Sumi1[,w,j] = (1 - ksS[,w,j]/k0)*(jsS[,w,j]/(lsS[,w,j]+jsS[,w,j])) ##rep2 
+    s_IRS_Sumi1[,w,j] = ksS[,w,j]/k0 ##feed2 = when IRS is implemented in month 1 (Nov)
+    r_IRS_Sumi1[,w,j] = (1 - ksS[,w,j]/k0)*(jsS[,w,j]/(lsS[,w,j]+jsS[,w,j])) ##rep2 
   }
 }
 
@@ -1897,7 +991,7 @@ for(k in 1:3){
       w_Sumi1[i,j,4,1+cl[k]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumi1[i,j,1])*s_ITN[i+547]*s_IRS_Sumi1[i,j,1] + 
         (PHI_I - PHI_B)*(1-r_IRS_Sumi1[i,j,1])*s_IRS_Sumi1[i,j,1] 
       ## probability of surviving biting given that there is ITN & IRS
-
+      
       
       w_Acte1[i,j,2,2+cl[k]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
       ## probability of surviving biting given that there is ITN
@@ -1914,7 +1008,7 @@ for(k in 1:3){
       w_Sumi1[i,j,4,2+cl[k]] = 1 - PHI_I + PHI_B*(1-r_IRS_Sumi1[i,j,2])*s_ITN[i+547]*s_IRS_Sumi1[i,j,2] + 
         (PHI_I - PHI_B)*(1-r_IRS_Sumi1[i,j,2])*s_IRS_Sumi1[i,j,2] 
       ## probability of surviving biting given that there is ITN & IRS
-
+      
       
       w_Acte1[i,j,2,3+cl[k]] = 1 - PHI_B + PHI_B*s_ITN[i+547]				 
       ## probability of surviving biting given that there is ITN
@@ -2078,7 +1172,7 @@ for(k in 1:3){
       z_Sumi1[i,j,3,1+cl[k]] = PHI_I*r_IRS_Sumi1[i,j,1]
       z_Sumi1[i,j,4,1+cl[k]] = PHI_B*(r_IRS_Sumi1[i,j,1] + (1-r_IRS_Sumi1[i,j,1])*r_ITN[i+547]) + 
         (PHI_I - PHI_B)*r_IRS_Sumi1[i,j,1]
-
+      
       
       z_Acte1[i,j,2,2+cl[k]] = PHI_B*r_ITN[i+547]
       z_Acte1[i,j,3,2+cl[k]] = PHI_I*r_IRS_Acte1[i,j,2]
@@ -2089,7 +1183,7 @@ for(k in 1:3){
       z_Sumi1[i,j,3,2+cl[k]] = PHI_I*r_IRS_Sumi1[i,j,2]
       z_Sumi1[i,j,4,2+cl[k]] = PHI_B*(r_IRS_Sumi1[i,j,2] + (1-r_IRS_Sumi1[i,j,2])*r_ITN[i+547]) + 
         (PHI_I - PHI_B)*r_IRS_Sumi1[i,j,2]
-
+      
       z_Acte1[i,j,2,3+cl[k]] = PHI_B*r_ITN[i+547]
       z_Acte1[i,j,3,3+cl[k]] = PHI_I*r_IRS_Acte1[i,j,3]
       z_Acte1[i,j,4,3+cl[k]] = PHI_B*(r_IRS_Acte1[i,j,3] + (1-r_IRS_Acte1[i,j,3])*r_ITN[i+547]) + 
@@ -2154,24 +1248,13 @@ text(x = -650, y = 1.2,"(D)")
 text(x = -340, y = 1.2,"(E)")
 text(x = -38, y = 1.2,"(F)")
 
-```
 
 
-Having worked out the estimated probability of mosquito success in the presence of the sprays and under the conditions estimated for the two settings given the prolonged spray campaign, we adapt a mechanistic vector model approach determined in Le Menach 2007 (3) and Griffin et al (2010) (4) and updated in Walker et al 2016 (5).
-
-In the next steps we estimate the relative lost protection, as a relative increase in probability of biting for people in the villages. We carry through the uncertainty from the section above. 
 
 
-```{r echo = TRUE, eval = FALSE}
-
-####################################
-##
-## Figure 5
-##
-####################################################
 
 
-#
+
 
 actellic_details = dta1[,1:7]#readRDS("data/actellic_details_v2.Rdata")
 sumishield_details = dta1[,c(1,8:13)]#readRDS("data/sumishield_details_v2.Rdata")
@@ -2471,8 +1554,7 @@ cov2S[,4] = itn_cov_Sumi[1:240]*irs_cov_Sumi[1:240] ## both interventions
 
 ## Entomological model parameters to estimate 
 
-Q0 = 0.92  ## this is anthropophagy - we can use human blood index
-           ## This can be varied 0.78 to 0.98 see Killeen et al. (2016) (7)
+Q0 = 0.98  ## this is anthropophagy - we can use human blood index
 chi = 0.86 ## this is endophily (pi_i)
 
 fv0 = 0.333 ## biting rate 1 bite every 3 days
@@ -3159,8 +2241,7 @@ cov2S[,4] = itn_cov_Sumi[1:240]*irs_cov_Sumi[1:240] ## both interventions
 
 ## Entomological model parameters to estimate 
 
-Q0 = 0.92  ## this is anthropophagy - we can use human blood index
-           ## This can be varied see ref (7)
+Q0 = 0.98  ## this is anthropophagy - we can use human blood index
 chi = 0.86 ## this is endophily (pi_i)
 
 fv0 = 0.333 ## biting rate 1 bite every 3 days
@@ -3343,24 +2424,3 @@ polygon(c(time[61:240],rev(time[61:240])),
         col=adegenet::transp("aquamarine",0.3),border=NA)
 
 
-
-
-
-```
-
-
-## References
-
-1. Sherrard-Smith E, Winskill P, Corbel V, Pennetier C, Djénontin A, Moore S, Richardson JH, Müller P, Edi C, Protopopoff N, Oxborough R, Agossa F, N'Guessan R, Rowland M, Churcher TS. 2018. Systematic review of indoor residual spray efficacy and effectiveness against Plasmodium falciparum in Africa. Nat Communs.9. 4982. DOI: 10.1038/s41467-018-07357-w
-
-2. Churcher TS, Lissenden N, Griffin JT, Worrall E, Ranson H. 2016.The impact of pyrethroid resistance on the efficacy and effectiveness of bednets for malaria control in Africa. ELife 5. DOI: 10.7554/eLife.16090
-
-3. Le Menach A, Takala S, McKenzie FE, Perisse A, Harris A, Flahault A, Smith DL. 2007. An elaborated feeding cycle model for reductions in vectorial capacity of night-biting mosquitoes by insecticide-treated nets. Malar J. 6. 10
-
-4. Griffin JT, Hollingsworth D, Okell LC, Churcher TS, White M, Hinsley W, Bousema T, Drakeley CJ, Ferguson NM, Basáñez M-G, Ghani AC. 2010. Reducing Plasmodium falciparum malaria transmission in Africa: a model-based evaluation of intervention strategies. PLoS Med. 7. e1000324. DOI:10.1371/journal.pmed.1000324
-
-5. Walker PGT, Griffin JT, Ferguson NM, Ghani AC. 2016. Estimating the most efficient allocation of interventions to achieve reductions in Plasmodium falciparum malaria burden and transmission in Africa: a modelling study. Lancet Global Health. 4. e474-84. DOI: 10.1016/S2214-109X(16)30073-0  
-
-6. Sherrard-Smith E, Skarp JE, Beale AD, Fornadel C, Norris LC, Moore SJ, Mihreteab S, Charlwood JD, Bhatt S, Winskill P, Griffin JT, Churcher TS. 2019. Mosquito feeding behaviour and how it influences residual malaria transmission across Africa. PNAS. DOI: 10.1073/pnas.1820646116
-
-7. Killeen GF, Kiware SS, Okumu FO, et al. Going beyond personal protection against mosquito bites to eliminate malaria transmission: population suppression of malaria vectors that exploit both human and animal blood. BMJ Global Health 2017;2: e000198. doi:10.1136/ bmjgh-2016-000198
